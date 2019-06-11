@@ -18,8 +18,12 @@ These features have been added by traversing the Java UI objects and manipulatin
 |Right Click + CRL + ALT|	Big + Orange + Bold|
 |Right Click + CRL + ALT + Shift|	Fun!|
 
+**Images**
+![Darcula](https://github.com/irsdl/BurpTabEssentials/blob/master/images/darcula.png)
+![Nimbus](https://github.com/irsdl/BurpTabEssentials/blob/master/images/nimbus.png)
 
-**Limitations:** 
+
+**Limitations** 
 * It does not save the settings – they need to be saved against the project file
 * It has a few colours and you may need to change the source code yourself
 * It's been tested against v2.0.x but should work fine against v1.7.x
