@@ -15,8 +15,8 @@ These features have been added by traversing the Java UI objects and manipulatin
 |Right Click + CTRL + SHIFT|	Decrease the Font Size + Bold|
 |Right Click + SHIFT|	Big + Green + Bold|
 |Right Click + ALT|	Big + Blue + Bold|
-|Right Click + CRL + ALT|	Big + Orange + Bold|
-|Right Click + CRL + ALT + Shift|	Fun!|
+|Right Click + CTRL + ALT|	Big + Orange + Bold|
+|Right Click + CTRL + ALT + Shift|	Fun!|
 
 **Images**
 
