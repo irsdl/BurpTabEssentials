@@ -13,22 +13,16 @@ package burp;
  * 
  * */
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Font;
-import java.awt.event.ActionEvent;
-import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.PrintWriter;
-import javax.swing.JPanel;
-import javax.swing.JTabbedPane;
-import javax.swing.SwingUtilities;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.swing.*;
 
 public class BurpExtender
-		implements IBurpExtender, ITab, IMessageEditorTabFactory, IMessageEditorTab, ComponentListener {
+		implements IBurpExtender, ITab, IExtensionStateListener {
 	
 	private String version = "0.1";
 	private PrintWriter _stdout;
@@ -36,6 +30,10 @@ public class BurpExtender
 	private IBurpExtenderCallbacks _callbacks;
 	private Boolean isActive = null;
 	private Boolean isDebug = false;
+
+	private JPanel dummyPanel;
+	private TabWatcher tabWatcher;
+	private JTabbedPane rootTabbedPane;
 
 	public synchronized Boolean getIsActive() {
 		if (this.isActive == null)
@@ -55,19 +53,209 @@ public class BurpExtender
 
 		// set our extension name
 		_callbacks.setExtensionName("Tab Essentials");
+		callbacks.registerExtensionStateListener(this);
 
 		// create our UI
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
+				dummyPanel = new JPanel(); //Will be removed shortly after it's added, doesn't need to be anything special!
+				callbacks.addSuiteTab(BurpExtender.this);
 
-				_callbacks.registerMessageEditorTabFactory(BurpExtender.this);
+				new Thread(() -> {
+					boolean foundUI = false;
+					int attemptsRemaining = 5;
 
+					while (!foundUI && attemptsRemaining > 0) {
+						try {
+							getRootTabbedPane();
+							foundUI = true;
+						} catch (Exception e) {
+							attemptsRemaining--;
+							try {
+								Thread.currentThread().sleep(1000);
+							} catch (InterruptedException ignored) {}
+						}
+					}
+
+					if(foundUI){
+						tabWatcher = new TabWatcher(Arrays.asList("Repeater", "Intruder"), mouseEvent -> {
+							tabClicked(mouseEvent);
+						});
+
+						if(BurpExtender.this.rootTabbedPane != null) {
+							tabWatcher.addTabListener(BurpExtender.this.rootTabbedPane);
+						}
+						callbacks.removeSuiteTab(BurpExtender.this);
+					}
+				}).start();
 			}
 		});
 
 	}
-	
+
+	@Override
+	public String getTabCaption() {
+		return "Tab Essentials";
+	}
+
+	@Override
+	public Component getUiComponent() {
+		return dummyPanel;
+	}
+
+	private void getRootTabbedPane(){
+		if(this.dummyPanel != null) {
+			JRootPane rootPane = ((JFrame) SwingUtilities.getWindowAncestor(this.dummyPanel)).getRootPane();
+			rootTabbedPane = (JTabbedPane) rootPane.getContentPane().getComponent(0);
+		}
+	}
+
+	private void tabClicked(final MouseEvent e){
+		if(SwingUtilities.isRightMouseButton(e)){
+			if(e.getComponent() instanceof JTabbedPane){
+				JTabbedPane tabbedPane = (JTabbedPane) e.getComponent();
+				int tabIndex = tabbedPane.getUI().tabForCoordinate(tabbedPane, e.getX(), e.getY());
+				if(tabIndex < 0 || tabIndex > tabbedPane.getTabCount()-1) return;
+
+				Component clickedTab = tabbedPane.getTabComponentAt(tabIndex);
+				if(!(clickedTab instanceof Container)) return;
+
+				String tabTitle = tabbedPane.getTitleAt(tabIndex);
+
+				boolean isCTRL_Key = (e.getModifiers() & ActionEvent.CTRL_MASK) == ActionEvent.CTRL_MASK;
+				boolean isALT_Key = (e.getModifiers() & ActionEvent.ALT_MASK) == ActionEvent.ALT_MASK;
+				boolean isSHIFT_Key = (e.getModifiers() & ActionEvent.SHIFT_MASK) == ActionEvent.SHIFT_MASK;
+				
+				Component gotLabel = ((Container) clickedTab).getComponent(0);
+				Font currentFont = gotLabel.getFont();
+				Component gotExitBox = ((Container) clickedTab).getComponent(1); // removing the X button
+				int maxSize = 40;
+				int minSize = 10;
+				int currentSize = currentFont.getSize();
+				
+				
+				if(!isCTRL_Key && !isALT_Key && !isSHIFT_Key) {
+					JPopupMenu popupMenu = createPopupMenu(tabbedPane, tabIndex, tabTitle, (Container) clickedTab);
+					popupMenu.show(tabbedPane, e.getX(), e.getY());
+				} else if (isCTRL_Key && !isALT_Key && !isSHIFT_Key) {
+					// Make it bigger and bold when rightclick + ctrl
+					if (currentSize < maxSize) {
+						gotLabel.setFont(new Font(currentFont.getFontName(),
+								Font.BOLD, ++currentSize));
+						gotExitBox.setVisible(false);
+					}
+				} else if (isCTRL_Key && !isALT_Key && isSHIFT_Key) {
+					// Make it smaller but bold when rightclick + ctrl + shift
+					if (currentSize > minSize) {
+						gotLabel.setFont(new Font(currentFont.getFontName(),
+								Font.BOLD, --currentSize));
+						gotExitBox.setVisible(false);
+					}
+				}else if (!isCTRL_Key && !isALT_Key && isSHIFT_Key) {
+					// right click with shift: should make it green and big and bold
+					Color textColor = new Color(0, 204, 51); // Green
+					tabbedPane.setBackgroundAt(tabIndex, textColor);
+					gotLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+					gotExitBox.setVisible(false);
+				} else if (!isCTRL_Key && isALT_Key && !isSHIFT_Key) {
+					// right click with alt: should make it blue and big and bold
+					Color textColor = new Color(0, 102, 255); // BLUE
+					tabbedPane.setBackgroundAt(tabIndex, textColor);
+					gotLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+					gotExitBox.setVisible(false);
+				} else if (isCTRL_Key && isALT_Key && !isSHIFT_Key) {
+					// right click with alt and ctrl: should make it orange and big and bold
+					Color textColor = new Color(255, 204, 51); // ORANGE
+					tabbedPane.setBackgroundAt(tabIndex, textColor);
+					gotLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+					gotExitBox.setVisible(false);
+				}else if (isCTRL_Key && isALT_Key && isSHIFT_Key){
+					// this is the funky mode! we don't serve drunks! but we do serve mad keyboard skillz!!
+					// crazy mode
+
+					tabbedPane.setBackgroundAt(tabIndex, Color.MAGENTA);
+					gotLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+					gotExitBox.setVisible(false);
+					Component selectedComp = tabbedPane.getSelectedComponent();
+					selectedComp.setBackground(Color.GREEN); // change colour of surrounding
+					tabbedPane.getParent().getParent().setBackground(Color.PINK);
+					JTabbedPane parentJTabbedPane = (JTabbedPane) tabbedPane.getParent();
+
+					for(int i=0; i <  parentJTabbedPane.getTabCount(); i++) {
+						if (parentJTabbedPane.getTitleAt(i).equals("Repeater")){
+							parentJTabbedPane.setTitleAt(i, "Repeater on ster0ids");
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private JPopupMenu createPopupMenu(JTabbedPane tabbedPane, int index, String title, Container tabComponent){
+		Component labelComponent = tabComponent.getComponent(0);
+		Component removeButton = tabComponent.getComponent(1);
+		JPopupMenu popupMenu = new JPopupMenu();
+
+		JMenuItem menuItem = new JMenuItem(title);
+		menuItem.setEnabled(false);
+		popupMenu.add(menuItem);
+		popupMenu.addSeparator();
+
+		JCheckBoxMenuItem closeButtonMenuItem = new JCheckBoxMenuItem("Remove Close Button");
+		closeButtonMenuItem.addActionListener(e -> {
+			removeButton.setVisible(!closeButtonMenuItem.isSelected());
+		});
+		closeButtonMenuItem.setSelected(!removeButton.isVisible());
+		popupMenu.add(closeButtonMenuItem);
+
+		JMenu fontSizeMenu = new JMenu("Font Size");
+		float minFontSize = 10, maxFontSize = 40;
+		for (float fontSize = minFontSize; fontSize < maxFontSize; fontSize+=2) {
+			JCheckBoxMenuItem sizeItem = new JCheckBoxMenuItem(fontSize + "");
+			float finalFontSize = fontSize;
+			sizeItem.addActionListener(e -> {
+				labelComponent.setFont(labelComponent.getFont().deriveFont(finalFontSize));
+			});
+			sizeItem.setSelected(labelComponent.getFont().getSize() == fontSize);
+			fontSizeMenu.add(sizeItem);
+		}
+		popupMenu.add(fontSizeMenu);
+
+		JCheckBoxMenuItem boldMenu = new JCheckBoxMenuItem("Bold");
+		boldMenu.setSelected(labelComponent.getFont().isBold());
+		boldMenu.addActionListener(e -> {
+			Font font = labelComponent.getFont().deriveFont(labelComponent.getFont().getStyle() ^ Font.BOLD);
+			labelComponent.setFont(font);
+		});
+		popupMenu.add(boldMenu);
+
+		JCheckBoxMenuItem italicMenu = new JCheckBoxMenuItem("Italic");
+		italicMenu.setSelected(labelComponent.getFont().isItalic());
+		italicMenu.addActionListener(e -> {
+			Font font = labelComponent.getFont().deriveFont(labelComponent.getFont().getStyle() ^ Font.ITALIC);
+			labelComponent.setFont(font);
+		});
+		popupMenu.add(italicMenu);
+
+		JMenuItem colorMenu = new JMenuItem("Set Foreground Color");
+		colorMenu.addActionListener(e -> {
+			Color color = JColorChooser.showDialog(colorMenu, "Select Foreground Color", labelComponent.getForeground());
+			tabbedPane.setBackgroundAt(index, color);
+		});
+		popupMenu.add(colorMenu);
+
+		return popupMenu;
+	}
+
+	@Override
+	public void extensionUnloaded() {
+		if(tabWatcher != null && rootTabbedPane != null){
+			tabWatcher.removeTabListener(rootTabbedPane);
+		}
+	}
+
 	// This is for later when I figure out how to save settings per project: https://twitter.com/irsdl/status/1138401437686423552
 	private Object loadExtensionSettingHelper(String name, String type, Object defaultValue) {
 		Object value = null;
@@ -96,223 +284,6 @@ public class BurpExtender
 			value = defaultValue;
 		}
 		return value;
-	}
-
-	@Override
-	public String getTabCaption() {
-		// TODO Auto-generated method stub
-		return "Tab Essentials";
-	}
-
-	@Override
-	public Component getUiComponent() {
-		JPanel jPanel = new JPanel();
-		jPanel.addComponentListener(this);
-		return jPanel;
-	}
-
-	@Override
-	public IMessageEditorTab createNewInstance(IMessageEditorController controller, boolean editable) {
-		// TODO Auto-generated method stub
-		return this;
-	}
-
-	@Override
-	public boolean isEnabled(byte[] content, boolean isRequest) {
-		if (getIsActive()) {
-			return false;
-		} else {
-			return true;
-		}
-
-	}
-
-	@Override
-	public void setMessage(byte[] content, boolean isRequest) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public byte[] getMessage() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public boolean isModified() {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public byte[] getSelectedData() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void componentHidden(ComponentEvent e) {
-		// We use this to detect a load. Ideally, we need to run this only once
-		if(isDebug) _stdout.println("componentHidden");
-		
-		if (!getIsActive()) {
-
-			try {
-				Component parentComponent = e.getComponent().getParent().getParent().getParent().getParent().getParent()
-						.getParent();
-				if (parentComponent instanceof JTabbedPane) {
-					// we call it repeater but it might be a different menu such as "Extension"!
-					JTabbedPane repeater_tabbed_pane = (JTabbedPane) parentComponent;
-					int tab_pos = repeater_tabbed_pane.getSelectedIndex();
-					if(isDebug) _stdout.println(repeater_tabbed_pane.getTitleAt(tab_pos));
-					Container tabComp = (Container) repeater_tabbed_pane.getTabComponentAt(tab_pos);
-					Component[] tabComComps = tabComp.getComponents();
-					if (tabComComps.length == 2) {
-						repeater_tabbed_pane.addMouseListener(new MouseAdapter() {
-							@Override
-							public void mousePressed(MouseEvent e) {
-								boolean isCTRL_Key = false;
-								boolean isALT_Key = false;
-								boolean isSHIFT_Key = false;
-								
-								if (SwingUtilities.isRightMouseButton(e)) {
-									if ((e.getModifiers() & ActionEvent.CTRL_MASK) == ActionEvent.CTRL_MASK) {
-										isCTRL_Key = true;
-									}
-									
-									if ((e.getModifiers() & ActionEvent.ALT_MASK) == ActionEvent.ALT_MASK) {
-										isALT_Key = true;
-									}
-									
-									if ((e.getModifiers() & ActionEvent.SHIFT_MASK) == ActionEvent.SHIFT_MASK) {
-										isSHIFT_Key = true;
-									}
-									
-									Component parentComponent = e.getComponent();
-									if (parentComponent instanceof JTabbedPane) {
-										JTabbedPane repeater_tabbed_pane = (JTabbedPane) parentComponent;
-
-										int tab_pos = repeater_tabbed_pane.getUI()
-												.tabForCoordinate(repeater_tabbed_pane, e.getX(), e.getY());
-										if (tab_pos > -1 && tab_pos < repeater_tabbed_pane.getTabCount() - 1) {
-											Container tabComp = (Container) repeater_tabbed_pane
-													.getTabComponentAt(tab_pos);
-											Component[] tabComComps = tabComp.getComponents();
-											if (tabComComps.length == 2) {
-												// We don't want change other menus! Can we? Yes we can!
-												Component gotLabel = tabComComps[0];
-												Font currentFont = gotLabel.getFont();
-												
-
-												Component gotExitBox = tabComComps[1]; // removing the X button
-
-												// Making the text bigger
-												int maxSize = 40;
-												int minSize = 10;
-												int currentSize = currentFont.getSize();
-												if(isDebug) _stdout.println("currentSize: " + currentSize);
-
-												if (isCTRL_Key && !isALT_Key && !isSHIFT_Key) {
-													// Make it bigger and bold when rightclick + ctrl
-													if (currentSize < maxSize) {
-														gotLabel.setFont(new Font(currentFont.getFontName(),
-																Font.BOLD, ++currentSize));
-														gotExitBox.setVisible(false);
-													}
-												} else if (isCTRL_Key && !isALT_Key && isSHIFT_Key) {
-													// Make it smaller but bold when rightclick + ctrl + shift
-													if (currentSize > minSize) {
-														gotLabel.setFont(new Font(currentFont.getFontName(),
-																Font.BOLD, --currentSize));
-														gotExitBox.setVisible(false);
-													}
-												} else if(!isCTRL_Key && !isALT_Key && !isSHIFT_Key) {
-													// just right click
-													// right click should make it big and bold or reset the style
-													Color textColor = new Color(255, 0, 51); // RED
-													
-													if (gotExitBox.isVisible()) {
-														// We want to change the colour or make it bold!
-														repeater_tabbed_pane.setBackgroundAt(tab_pos, textColor); 
-														gotLabel.setFont(new Font("Dialog", Font.BOLD, 20)); 
-														gotExitBox.setVisible(false);
-													} else {
-														// remove the colour and style
-														repeater_tabbed_pane.setBackgroundAt(tab_pos, null); 
-														gotLabel.setFont(null);
-														gotExitBox.setVisible(true);
-													}
-												}else if (!isCTRL_Key && !isALT_Key && isSHIFT_Key) {
-													// right click with shift: should make it green and big and bold
-													Color textColor = new Color(0, 204, 51); // Green
-													repeater_tabbed_pane.setBackgroundAt(tab_pos, textColor); 
-													gotLabel.setFont(new Font("Dialog", Font.BOLD, 20)); 
-													gotExitBox.setVisible(false);
-												} else if (!isCTRL_Key && isALT_Key && !isSHIFT_Key) {
-													// right click with alt: should make it blue and big and bold 
-													Color textColor = new Color(0, 102, 255); // BLUE
-													repeater_tabbed_pane.setBackgroundAt(tab_pos, textColor); 
-													gotLabel.setFont(new Font("Dialog", Font.BOLD, 20)); 
-													gotExitBox.setVisible(false);
-												} else if (isCTRL_Key && isALT_Key && !isSHIFT_Key) {
-													// right click with alt and ctrl: should make it orange and big and bold
-													Color textColor = new Color(255, 204, 51); // ORANGE
-													repeater_tabbed_pane.setBackgroundAt(tab_pos, textColor); 
-													gotLabel.setFont(new Font("Dialog", Font.BOLD, 20)); 
-													gotExitBox.setVisible(false);
-												}else if (isCTRL_Key && isALT_Key && isSHIFT_Key){
-													// this is the funky mode! we don't serve drunks! but we do serve mad keyboard skillz!!
-													// crazy mode
-													
-													repeater_tabbed_pane.setBackgroundAt(tab_pos, Color.MAGENTA); 
-													gotLabel.setFont(new Font("Dialog", Font.BOLD, 20)); 
-													gotExitBox.setVisible(false);
-													Component selectedComp = repeater_tabbed_pane.getSelectedComponent();
-													selectedComp.setBackground(Color.GREEN); // change colour of surrounding
-													repeater_tabbed_pane.getParent().getParent().setBackground(Color.PINK);
-													JTabbedPane parentJTabbedPane = (JTabbedPane) repeater_tabbed_pane.getParent();
-													
-													for(int i=0; i <  parentJTabbedPane.getTabCount(); i++) {
-														if (parentJTabbedPane.getTitleAt(i).equals("Repeater")){
-															parentJTabbedPane.setTitleAt(i, "Repeater on ster0id");
-															break;
-														}
-													}
-												}										
-											}
-										}
-									}
-								}
-							}
-						});
-
-						setIsActive(true);
-					}
-				}
-			} catch (Exception err) {
-				_stderr.println(err.getMessage());
-			}
-
-		}
-	}
-
-	@Override
-	public void componentMoved(ComponentEvent e) {
-		// We don't use this - no need to hack this!
-		if(isDebug) _stdout.println("componentMoved");
-	}
-
-	@Override
-	public void componentResized(ComponentEvent e) {
-		// We don't use this - no need to hack this!
-		if(isDebug) _stdout.println("componentResized");
-	}
-
-	@Override
-	public void componentShown(ComponentEvent e) {
-		// We don't use this - no need to hack this!
-		if(isDebug) _stdout.println("componentShown");
 	}
 
 }

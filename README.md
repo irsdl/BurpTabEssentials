@@ -10,7 +10,7 @@ These features have been added by traversing the Java UI objects and manipulatin
 
 | Combination | Description |
 | --- | --- |
-|Right Click|		Big + Red + Bold, Reset|
+|Right Click|		Show Context Menu|
 |Right Click + CTRL|	Increase the Font Size + Bold|
 |Right Click + CTRL + SHIFT|	Decrease the Font Size + Bold|
 |Right Click + SHIFT|	Big + Green + Bold|
@@ -26,10 +26,9 @@ These features have been added by traversing the Java UI objects and manipulatin
 
 
 **Limitations** 
-* It does not save the settings – they need to be saved against the project file
-* It has a few colours and you may need to change the source code yourself
+* It **does not** save the settings – they need to be saved against the project file
 * It's been tested against v2.0.x but should work fine against v1.7.x
-* There is no nice menu to right click and activate at the moment!
+* <del>There is no nice menu to right click and activate at the moment!</del>
 * It might be confused if you add the extension more than once or reload it multiple times (try to restart burp)
 
 Please feel free to report bugs or add features
