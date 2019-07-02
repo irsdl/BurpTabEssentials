@@ -6,7 +6,17 @@ These features have been added by traversing the Java UI objects and manipulatin
 # Installation and Usage
 * Download the jar file from the [release](https://github.com/irsdl/BurpTabEssentials/releases) section
 * Add it to Burp Suite using the Extender tab
-* Right click on Repeater's tabs and see it yourself!
+* You can use the following key combinations:
+
+| Combination | Description |	
+| --- | --- |	
+|Right Click|		Show Context Menu|	
+|Right Click + CTRL|	Increase the Font Size + Bold|	
+|Right Click + CTRL + SHIFT|	Decrease the Font Size + Bold|	
+|Right Click + SHIFT|	Big + Green + Bold|	
+|Right Click + ALT|	Big + Blue + Bold|	
+|Right Click + CTRL + ALT|	Big + Orange + Bold|	
+|Right Click + CTRL + ALT + Shift|	Fun!|
 
 **Images**
 
