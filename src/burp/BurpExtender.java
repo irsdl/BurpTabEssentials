@@ -6,6 +6,7 @@ package burp;
  * 
  * Developed by:
  *     Soroush Dalili (@irsdl)
+ *     Corey Arthur (@CoreyD97)
  * 
  * Project link: https://github.com/irsdl/BurpTabEssentials
  * 
@@ -24,7 +25,7 @@ import javax.swing.*;
 public class BurpExtender
 		implements IBurpExtender, ITab, IExtensionStateListener {
 	
-	private String version = "0.1";
+	private String version = "0.3";
 	private PrintWriter _stdout;
 	private PrintWriter _stderr;
 	private IBurpExtenderCallbacks _callbacks;
@@ -60,7 +61,7 @@ public class BurpExtender
 			@Override
 			public void run() {
 				dummyPanel = new JPanel(); //Will be removed shortly after it's added, doesn't need to be anything special!
-				callbacks.addSuiteTab(BurpExtender.this);
+				_callbacks.addSuiteTab(BurpExtender.this);
 
 				new Thread(() -> {
 					boolean foundUI = false;
