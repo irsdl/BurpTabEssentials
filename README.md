@@ -24,6 +24,10 @@ These features have been added by traversing the Java UI objects and manipulatin
 
 ![Nimbus](https://github.com/irsdl/BurpTabEssentials/blob/master/images/nimbus.png)
 
+**Thanks to**
+
+The simple idea behind changing a repeater tab colour came originally from a private extension written by Bruno Demarche a few years before this extension. That extension changed the text colour of a repeater tab when a comment was added to a request.
+
 
 **Limitations** 
 * It **does not** save the settings – they need to be saved against the project file
